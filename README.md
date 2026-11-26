@@ -66,8 +66,8 @@ Cinco páginas: Visão Executiva, Categorias e Estados, Logística e Satisfaçã
 Requer Python 3.11+ (desenvolvido em 3.14).
 
 ```bash
-git clone <URL-DO-REPOSITORIO>
-cd <pasta>
+git clone https://github.com/YuriB4rbosa/olist-ecommerce-analytics.git
+cd olist-ecommerce-analytics
 python -m venv .venv && .venv\Scripts\activate        # Linux/Mac: source .venv/bin/activate
 pip install -r requirements.txt
 
