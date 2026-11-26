@@ -33,7 +33,10 @@ olist-dataset/
 python -m venv .venv && .venv\Scripts\activate
 pip install -r requirements.txt
 # Coloque os CSVs do Kaggle em data/raw/
-jupyter lab
+python -m src.run_clean      # limpeza  -> data/processed/clean
+python -m src.run_model      # modelo estrela -> data/processed/model
+python -m src.export_powerbi # tabelas p/ Power BI -> data/processed/powerbi
+jupyter lab                  # notebooks 01 e 02
 ```
 
 ## Stack
@@ -41,9 +44,9 @@ Python · Pandas · Matplotlib/Seaborn · Parquet · Power BI (DAX)
 
 ## Status
 - [x] Etapa 1 — Estrutura
-- [ ] Etapa 2 — Exploração e limpeza
-- [ ] Etapa 3 — Modelagem
-- [ ] Etapa 4 — Análise
-- [ ] Etapa 5 — Exportação
+- [x] Etapa 2 — Exploração e limpeza
+- [x] Etapa 3 — Modelagem
+- [x] Etapa 4 — Análise
+- [x] Etapa 5 — Exportação
 - [ ] Etapa 6 — Power BI
 - [ ] Etapa 7 — Divulgação
