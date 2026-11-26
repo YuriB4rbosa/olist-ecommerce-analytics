@@ -1,6 +1,6 @@
 # Rascunho do post de LinkedIn
 
-> Antes de publicar: troque `[LINK]`, confira se os prints do dashboard estão no repositório e **remova a linha marcada com ⚠️ se ainda não tiver montado o dashboard**. Anexe 1 imagem forte: `docs/img/q3_atraso_vs_nota.png` ou a Visão Executiva do dashboard.
+> Antes de publicar: confira se os prints do dashboard estão no repositório e **remova a linha marcada com ⚠️ se ainda não tiver montado o dashboard**. Anexe 1 imagem forte: `docs/img/q3_atraso_vs_nota.png` ou a Visão Executiva do dashboard.
 
 ---
 
@@ -35,7 +35,7 @@ O faturamento crescia, mas ninguém sabia se vinha de clientes novos, de preço 
 
 Um detalhe que me ensinou muito: ao validar minhas medidas, descobri que contar atraso por linha de item e por pedido distinto dava resultados diferentes (40 vs 37 vendedores problemáticos). Pequena diferença no número, grande diferença na credibilidade da análise.
 
-Código, notebooks e documentação das decisões: [LINK]
+Código, notebooks e documentação das decisões: https://github.com/YuriB4rbosa/olist-ecommerce-analytics
 
 Vim do desenvolvimento backend (Python/Django/PostgreSQL) e esse projeto foi minha forma de aplicar esse olhar a dados. Feedback é muito bem-vindo!
 
@@ -52,7 +52,7 @@ Usei dados reais de 100 mil pedidos de um e-commerce para responder: onde esse n
 • O gargalo logístico é geográfico: 21% de atraso em AL vs 4,5% em SP. Só 2,8% dos pedidos vêm dos vendedores com pior desempenho.
 • Só 3% dos clientes voltam a comprar, e quem volta o faz em até ~28 dias.
 
-Feito com Python/Pandas [+ Power BI]. Código e decisões no GitHub: [LINK]
+Feito com Python/Pandas [+ Power BI]. Código e decisões no GitHub: https://github.com/YuriB4rbosa/olist-ecommerce-analytics
 
 #AnáliseDeDados #Python #PowerBI
 
