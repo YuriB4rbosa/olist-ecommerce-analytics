@@ -88,5 +88,8 @@ jupyter lab                    # notebooks 01 e 02
 └── docs/              decisões de limpeza, modelo de dados, guia do dashboard, gráficos
 ```
 
+## Licença
+Código sob licença [MIT](LICENSE). Os dados da Olist têm licença própria (veja abaixo).
+
 ## Créditos
 Dataset: *Brazilian E-Commerce Public Dataset by Olist* (Kaggle). Consulte a página do dataset para a licença de uso.
