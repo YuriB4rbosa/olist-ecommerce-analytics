@@ -48,5 +48,5 @@ Python · Pandas · Matplotlib/Seaborn · Parquet · Power BI (DAX)
 - [x] Etapa 3 — Modelagem
 - [x] Etapa 4 — Análise
 - [x] Etapa 5 — Exportação
-- [ ] Etapa 6 — Power BI
+- [~] Etapa 6 — Power BI (medidas DAX e roteiro prontos em `powerbi/` e `docs/`; montagem do `.pbix` pendente)
 - [ ] Etapa 7 — Divulgação

@@ -8,7 +8,7 @@ Decisões de design (detalhes em docs/powerbi_modelo.md):
 - fact_items NÃO carrega date_key/flags de pedido: evita dois caminhos de filtro desde dim_date
   (dim_date -> fact_orders -> fact_items e dim_date -> fact_items) e relacionamentos ambíguos.
 - Receita vive só em fact_items.revenue (fonte única); fact_orders não repete revenue/freight.
-- Flags booleanas viram 0/1 (nulo quando não se aplica) para AVERAGE/SUM funcionarem direto em DAX.
+- Flags booleanas viram 0/1 (nulo quando não se aplica; em DAX teste sempre '= 1', nunca '= 0') para AVERAGE/SUM funcionarem direto em DAX.
 """
 import pandas as pd
 from .config import PROCESSED
@@ -40,6 +40,7 @@ def prep_fact_orders(fo: pd.DataFrame) -> pd.DataFrame:
         "delivery_days": fo["delivery_days"],
         "estimated_days": fo["estimated_days"],
         "delay_days": fo["delay_days"],
+        "is_delivered": _flag(fo["is_late"].notna()),  # 1 = entregue c/ data (nunca nulo; em DAX BLANK()=0, então não filtre is_late = 0)
         "is_late": _flag(fo["is_late"]),
         "items_qty": fo["items_qty"].astype(int),
         "payment_value": fo["payment_value"],

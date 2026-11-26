@@ -1,0 +1,204 @@
+// =====================================================================================
+// Medidas DAX do dashboard Olist  —  copie cada bloco em "Nova medida" (ou "Nova coluna")
+// Modelo: ver docs/powerbi_modelo.md · Valores esperados: docs/powerbi_dashboard.md
+//
+// REGRAS DO MODELO QUE ESTAS MEDIDAS RESPEITAM
+//  1) Receita vive em fact_items. O filtro de pedido/data/UF desce de fact_orders para fact_items.
+//  2) O filtro NÃO sobe de fact_items para fact_orders. Por isso medidas de pedido (atraso, nota)
+//     que precisam reagir a categoria/vendedor usam DISTINCTCOUNT(fact_items[order_id]) ou CROSSFILTER.
+//  3) Em DAX, BLANK() = 0 é VERDADEIRO. Por isso as flags são testadas sempre com "= 1" e nunca com "= 0"
+//     (use fact_orders[is_delivered] = 1 para o universo de pedidos entregues).
+//  4) Filtro de relatório recomendado: dim_date[in_analysis_period] = 1 (jan/2017–ago/2018).
+// =====================================================================================
+
+
+// ---------- 1. RECEITA E PEDIDOS ---------------------------------------------------
+
+Faturamento =
+CALCULATE (
+    SUM ( fact_items[revenue] ),
+    fact_orders[is_valid_order] = 1
+)
+
+Frete Total =
+CALCULATE (
+    SUM ( fact_items[freight_value] ),
+    fact_orders[is_valid_order] = 1
+)
+
+Pedidos =
+CALCULATE (
+    DISTINCTCOUNT ( fact_items[order_id] ),
+    fact_orders[is_valid_order] = 1
+)
+
+Ticket Médio =
+DIVIDE ( [Faturamento], [Pedidos] )
+
+Frete % do Faturamento =
+DIVIDE ( [Frete Total], [Faturamento] )
+
+% do Faturamento Total =
+DIVIDE ( [Faturamento], CALCULATE ( [Faturamento], ALLSELECTED () ) )
+
+
+// ---------- 2. COMPARAÇÃO NO TEMPO (exige dim_date marcada como tabela de datas) -----
+
+Faturamento Mês Anterior =
+CALCULATE ( [Faturamento], DATEADD ( dim_date[date], -1, MONTH ) )
+
+Var MoM % =
+DIVIDE ( [Faturamento] - [Faturamento Mês Anterior], [Faturamento Mês Anterior] )
+
+Faturamento Ano Anterior =
+CALCULATE ( [Faturamento], SAMEPERIODLASTYEAR ( dim_date[date] ) )
+
+Var YoY % =
+DIVIDE ( [Faturamento] - [Faturamento Ano Anterior], [Faturamento Ano Anterior] )
+
+
+// ---------- 3. LOGÍSTICA (base = pedidos distintos; reage a data, UF, categoria e vendedor) ----
+
+Pedidos Entregues =
+CALCULATE (
+    DISTINCTCOUNT ( fact_items[order_id] ),
+    fact_orders[is_delivered] = 1
+)
+
+Pedidos Atrasados =
+CALCULATE (
+    DISTINCTCOUNT ( fact_items[order_id] ),
+    fact_orders[is_late] = 1
+)
+
+% Pedidos Atrasados =
+DIVIDE ( [Pedidos Atrasados], [Pedidos Entregues] )
+
+Prazo Mediano de Entrega (dias) =
+CALCULATE (
+    MEDIAN ( fact_orders[delivery_days] ),
+    CROSSFILTER ( fact_items[order_id], fact_orders[order_id], BOTH )
+)
+
+Atraso Médio dos Atrasados (dias) =
+CALCULATE (
+    AVERAGE ( fact_orders[delay_days] ),
+    fact_orders[is_late] = 1,
+    CROSSFILTER ( fact_items[order_id], fact_orders[order_id], BOTH )
+)
+
+
+// ---------- 4. SATISFAÇÃO ---------------------------------------------------------
+
+Nota Média =
+CALCULATE (
+    AVERAGE ( fact_orders[review_score] ),
+    CROSSFILTER ( fact_items[order_id], fact_orders[order_id], BOTH )
+)
+
+% Avaliações 1-2 =
+VAR _avaliadas =
+    CALCULATE (
+        COUNT ( fact_orders[review_score] ),
+        CROSSFILTER ( fact_items[order_id], fact_orders[order_id], BOTH )
+    )
+VAR _ruins =
+    CALCULATE (
+        COUNT ( fact_orders[review_score] ),
+        fact_orders[review_score] <= 2,
+        CROSSFILTER ( fact_items[order_id], fact_orders[order_id], BOTH )
+    )
+RETURN
+    DIVIDE ( _ruins, _avaliadas )
+
+
+// ---------- 5. CLIENTES E RECOMPRA (pessoa = customer_unique_id) --------------------
+
+Clientes =
+CALCULATE (
+    DISTINCTCOUNT ( fact_orders[customer_unique_id] ),
+    fact_orders[is_valid_order] = 1
+)
+
+Clientes Recorrentes =
+CALCULATE (
+    DISTINCTCOUNT ( fact_orders[customer_unique_id] ),
+    fact_orders[is_valid_order] = 1,
+    fact_orders[is_recurring_customer] = 1
+)
+
+Taxa de Recompra =
+DIVIDE ( [Clientes Recorrentes], [Clientes] )
+
+Clientes Novos =
+CALCULATE (
+    DISTINCTCOUNT ( fact_orders[customer_unique_id] ),
+    fact_orders[is_valid_order] = 1,
+    fact_orders[is_first_order] = 1
+)
+
+// Cohort: % dos clientes de cada mês de 1ª compra que voltam a comprar k meses depois.
+// Matriz: linhas = fact_orders[cohort_month], colunas = fact_orders[Meses Desde 1ª Compra].
+Retenção Cohort =
+VAR _tamanho_cohort =
+    CALCULATE (
+        [Clientes],
+        REMOVEFILTERS ( fact_orders[Meses Desde 1ª Compra] ),
+        fact_orders[Meses Desde 1ª Compra] = 0
+    )
+RETURN
+    DIVIDE ( [Clientes], _tamanho_cohort )
+
+
+// ---------- 6. COLUNAS CALCULADAS (tabela fact_orders) -------------------------------
+// Criar em: fact_orders > Nova coluna
+
+Meses Desde 1ª Compra =
+IF (
+    ISBLANK ( fact_orders[cohort_month] ),
+    BLANK (),
+    DATEDIFF ( fact_orders[cohort_month], fact_orders[purchase_timestamp], MONTH )
+)
+
+Faixa Atraso =
+VAR _d = fact_orders[delay_days]
+RETURN
+    SWITCH (
+        TRUE (),
+        ISBLANK ( _d ), BLANK (),
+        _d < 0, "1. Adiantado",
+        _d = 0, "2. No dia",
+        _d <= 3, "3. 1–3 dias",
+        _d <= 7, "4. 4–7 dias",
+        _d <= 14, "5. 8–14 dias",
+        "6. > 14 dias"
+    )
+
+Faixa Parcelas =
+VAR _p = fact_orders[installments_max]
+RETURN
+    SWITCH (
+        TRUE (),
+        ISBLANK ( _p ), BLANK (),
+        _p <= 1, "1. 1x",
+        _p <= 3, "2. 2–3x",
+        _p <= 6, "3. 4–6x",
+        _p <= 10, "4. 7–10x",
+        "5. > 10x"
+    )
+
+Valor Produtos =
+SUMX ( RELATEDTABLE ( fact_items ), fact_items[revenue] )
+
+Faixa Valor Pedido =
+VAR _v = fact_orders[Valor Produtos]
+RETURN
+    SWITCH (
+        TRUE (),
+        _v = 0, BLANK (),        // pedido sem item (BLANK() = 0 em DAX)
+        _v <= 50, "1. Até R$ 50",
+        _v <= 100, "2. R$ 50–100",
+        _v <= 200, "3. R$ 100–200",
+        _v <= 500, "4. R$ 200–500",
+        "5. > R$ 500"
+    )

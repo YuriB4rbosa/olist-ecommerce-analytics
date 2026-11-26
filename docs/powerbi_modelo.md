@@ -5,7 +5,7 @@ Saída em `data/processed/powerbi/` (não versionada): 6 tabelas em **CSV** (UTF
 
 | Tabela | Linhas | Colunas | Papel |
 |---|---|---|---|
-| fact_orders | 99.441 | 23 | Fato, grão = pedido (datas, prazo, atraso, nota, pagamento, recorrência) |
+| fact_orders | 99.441 | 24 | Fato, grão = pedido (datas, prazo, atraso, nota, pagamento, recorrência) |
 | fact_items | 112.650 | 6 | Fato, grão = item (receita, frete, produto, vendedor) |
 | dim_date | 852 | 11 | Calendário (2016-09 a 2018-12), rótulos em português |
 | dim_customer | 99.441 | 7 | Cliente por pedido (`customer_id`), com `customer_unique_id`, UF, lat/lng |
@@ -57,10 +57,12 @@ Com `date_key` nas duas fatos, `dim_date` alcançaria `fact_items` por dois cami
 6. **Filtro de período:** `dim_date[in_analysis_period] = 1` (jan/2017–ago/2018) como filtro de relatório, igual às análises em Python.
 
 ## Flags (todas 0/1, nulo quando não se aplica)
+> **Armadilha de DAX:** `BLANK() = 0` é verdadeiro. Teste flags sempre com `= 1`, nunca `= 0`; um filtro `is_late = 0` incluiria os pedidos não entregues (nulos).
 | Coluna | Significado |
 |---|---|
 | `is_valid_order` | 1 = status diferente de `canceled`/`unavailable`. **Filtrar em quase toda medida de receita** |
 | `is_late` | 1 = entregue após a data estimada; nulo se não foi entregue (então `AVERAGE(is_late)` já dá o % de atrasados) |
+| `is_delivered` | 1 = entregue com data de entrega; **nunca nulo**. Use-o como universo de entregues em DAX |
 | `is_first_order` | 1 = primeira compra válida da pessoa (para contar clientes novos) |
 | `is_recurring_customer` | 1 = a pessoa tem 2+ pedidos válidos |
 
