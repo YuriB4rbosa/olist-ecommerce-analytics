@@ -3,12 +3,12 @@
 // Modelo: ver docs/powerbi_modelo.md · Valores esperados: docs/powerbi_dashboard.md
 //
 // REGRAS DO MODELO QUE ESTAS MEDIDAS RESPEITAM
-//  1) Receita vive em fact_items. O filtro de pedido/data/UF desce de fact_orders para fact_items.
-//  2) O filtro NÃO sobe de fact_items para fact_orders. Por isso medidas de pedido (atraso, nota)
-//     que precisam reagir a categoria/vendedor usam DISTINCTCOUNT(fact_items[order_id]) ou CROSSFILTER.
+//  1) Receita vive em fato_itens. O filtro de pedido/data/UF desce de fato_pedidos para fato_itens.
+//  2) O filtro NÃO sobe de fato_itens para fato_pedidos. Por isso medidas de pedido (atraso, nota)
+//     que precisam reagir a categoria/vendedor usam DISTINCTCOUNT(fato_itens[id_pedido]) ou CROSSFILTER.
 //  3) Em DAX, BLANK() = 0 é VERDADEIRO. Por isso as flags são testadas sempre com "= 1" e nunca com "= 0"
-//     (use fact_orders[is_delivered] = 1 para o universo de pedidos entregues).
-//  4) Filtro de relatório recomendado: dim_date[in_analysis_period] = 1 (jan/2017–ago/2018).
+//     (use fato_pedidos[entregue] = 1 para o universo de pedidos entregues).
+//  4) Filtro de relatório recomendado: dim_data[periodo_analise] = 1 (jan/2017–ago/2018).
 // =====================================================================================
 
 
@@ -16,20 +16,20 @@
 
 Faturamento =
 CALCULATE (
-    SUM ( fact_items[revenue] ),
-    fact_orders[is_valid_order] = 1
+    SUM ( fato_itens[receita] ),
+    fato_pedidos[pedido_valido] = 1
 )
 
 Frete Total =
 CALCULATE (
-    SUM ( fact_items[freight_value] ),
-    fact_orders[is_valid_order] = 1
+    SUM ( fato_itens[valor_frete] ),
+    fato_pedidos[pedido_valido] = 1
 )
 
 Pedidos =
 CALCULATE (
-    DISTINCTCOUNT ( fact_items[order_id] ),
-    fact_orders[is_valid_order] = 1
+    DISTINCTCOUNT ( fato_itens[id_pedido] ),
+    fato_pedidos[pedido_valido] = 1
 )
 
 Ticket Médio =
@@ -42,16 +42,16 @@ DIVIDE ( [Frete Total], [Faturamento] )
 DIVIDE ( [Faturamento], CALCULATE ( [Faturamento], ALLSELECTED () ) )
 
 
-// ---------- 2. COMPARAÇÃO NO TEMPO (exige dim_date marcada como tabela de datas) -----
+// ---------- 2. COMPARAÇÃO NO TEMPO (exige dim_data marcada como tabela de datas) -----
 
 Faturamento Mês Anterior =
-CALCULATE ( [Faturamento], DATEADD ( dim_date[date], -1, MONTH ) )
+CALCULATE ( [Faturamento], DATEADD ( dim_data[data], -1, MONTH ) )
 
 Var MoM % =
 DIVIDE ( [Faturamento] - [Faturamento Mês Anterior], [Faturamento Mês Anterior] )
 
 Faturamento Ano Anterior =
-CALCULATE ( [Faturamento], SAMEPERIODLASTYEAR ( dim_date[date] ) )
+CALCULATE ( [Faturamento], SAMEPERIODLASTYEAR ( dim_data[data] ) )
 
 Var YoY % =
 DIVIDE ( [Faturamento] - [Faturamento Ano Anterior], [Faturamento Ano Anterior] )
@@ -61,14 +61,14 @@ DIVIDE ( [Faturamento] - [Faturamento Ano Anterior], [Faturamento Ano Anterior] 
 
 Pedidos Entregues =
 CALCULATE (
-    DISTINCTCOUNT ( fact_items[order_id] ),
-    fact_orders[is_delivered] = 1
+    DISTINCTCOUNT ( fato_itens[id_pedido] ),
+    fato_pedidos[entregue] = 1
 )
 
 Pedidos Atrasados =
 CALCULATE (
-    DISTINCTCOUNT ( fact_items[order_id] ),
-    fact_orders[is_late] = 1
+    DISTINCTCOUNT ( fato_itens[id_pedido] ),
+    fato_pedidos[atrasado] = 1
 )
 
 % Pedidos Atrasados =
@@ -76,15 +76,15 @@ DIVIDE ( [Pedidos Atrasados], [Pedidos Entregues] )
 
 Prazo Mediano de Entrega (dias) =
 CALCULATE (
-    MEDIAN ( fact_orders[delivery_days] ),
-    CROSSFILTER ( fact_items[order_id], fact_orders[order_id], BOTH )
+    MEDIAN ( fato_pedidos[dias_entrega] ),
+    CROSSFILTER ( fato_itens[id_pedido], fato_pedidos[id_pedido], BOTH )
 )
 
 Atraso Médio dos Atrasados (dias) =
 CALCULATE (
-    AVERAGE ( fact_orders[delay_days] ),
-    fact_orders[is_late] = 1,
-    CROSSFILTER ( fact_items[order_id], fact_orders[order_id], BOTH )
+    AVERAGE ( fato_pedidos[dias_atraso] ),
+    fato_pedidos[atrasado] = 1,
+    CROSSFILTER ( fato_itens[id_pedido], fato_pedidos[id_pedido], BOTH )
 )
 
 
@@ -92,39 +92,39 @@ CALCULATE (
 
 Nota Média =
 CALCULATE (
-    AVERAGE ( fact_orders[review_score] ),
-    CROSSFILTER ( fact_items[order_id], fact_orders[order_id], BOTH )
+    AVERAGE ( fato_pedidos[nota_avaliacao] ),
+    CROSSFILTER ( fato_itens[id_pedido], fato_pedidos[id_pedido], BOTH )
 )
 
 % Avaliações 1-2 =
 VAR _avaliadas =
     CALCULATE (
-        COUNT ( fact_orders[review_score] ),
-        CROSSFILTER ( fact_items[order_id], fact_orders[order_id], BOTH )
+        COUNT ( fato_pedidos[nota_avaliacao] ),
+        CROSSFILTER ( fato_itens[id_pedido], fato_pedidos[id_pedido], BOTH )
     )
 VAR _ruins =
     CALCULATE (
-        COUNT ( fact_orders[review_score] ),
-        fact_orders[review_score] <= 2,
-        CROSSFILTER ( fact_items[order_id], fact_orders[order_id], BOTH )
+        COUNT ( fato_pedidos[nota_avaliacao] ),
+        fato_pedidos[nota_avaliacao] <= 2,
+        CROSSFILTER ( fato_itens[id_pedido], fato_pedidos[id_pedido], BOTH )
     )
 RETURN
     DIVIDE ( _ruins, _avaliadas )
 
 
-// ---------- 5. CLIENTES E RECOMPRA (pessoa = customer_unique_id) --------------------
+// ---------- 5. CLIENTES E RECOMPRA (pessoa = id_cliente_unico) --------------------
 
 Clientes =
 CALCULATE (
-    DISTINCTCOUNT ( fact_orders[customer_unique_id] ),
-    fact_orders[is_valid_order] = 1
+    DISTINCTCOUNT ( fato_pedidos[id_cliente_unico] ),
+    fato_pedidos[pedido_valido] = 1
 )
 
 Clientes Recorrentes =
 CALCULATE (
-    DISTINCTCOUNT ( fact_orders[customer_unique_id] ),
-    fact_orders[is_valid_order] = 1,
-    fact_orders[is_recurring_customer] = 1
+    DISTINCTCOUNT ( fato_pedidos[id_cliente_unico] ),
+    fato_pedidos[pedido_valido] = 1,
+    fato_pedidos[cliente_recorrente] = 1
 )
 
 Taxa de Recompra =
@@ -132,36 +132,36 @@ DIVIDE ( [Clientes Recorrentes], [Clientes] )
 
 Clientes Novos =
 CALCULATE (
-    DISTINCTCOUNT ( fact_orders[customer_unique_id] ),
-    fact_orders[is_valid_order] = 1,
-    fact_orders[is_first_order] = 1
+    DISTINCTCOUNT ( fato_pedidos[id_cliente_unico] ),
+    fato_pedidos[pedido_valido] = 1,
+    fato_pedidos[primeira_compra] = 1
 )
 
 // Cohort: % dos clientes de cada mês de 1ª compra que voltam a comprar k meses depois.
-// Matriz: linhas = fact_orders[cohort_month], colunas = fact_orders[Meses Desde 1ª Compra].
+// Matriz: linhas = fato_pedidos[mes_coorte], colunas = fato_pedidos[Meses Desde 1ª Compra].
 Retenção Cohort =
 VAR _tamanho_cohort =
     CALCULATE (
         [Clientes],
-        REMOVEFILTERS ( fact_orders[Meses Desde 1ª Compra] ),
-        fact_orders[Meses Desde 1ª Compra] = 0
+        REMOVEFILTERS ( fato_pedidos[Meses Desde 1ª Compra] ),
+        fato_pedidos[Meses Desde 1ª Compra] = 0
     )
 RETURN
     DIVIDE ( [Clientes], _tamanho_cohort )
 
 
-// ---------- 6. COLUNAS CALCULADAS (tabela fact_orders) -------------------------------
-// Criar em: fact_orders > Nova coluna
+// ---------- 6. COLUNAS CALCULADAS (tabela fato_pedidos) -------------------------------
+// Criar em: fato_pedidos > Nova coluna
 
 Meses Desde 1ª Compra =
 IF (
-    ISBLANK ( fact_orders[cohort_month] ),
+    ISBLANK ( fato_pedidos[mes_coorte] ),
     BLANK (),
-    DATEDIFF ( fact_orders[cohort_month], fact_orders[purchase_timestamp], MONTH )
+    DATEDIFF ( fato_pedidos[mes_coorte], fato_pedidos[datahora_compra], MONTH )
 )
 
 Faixa Atraso =
-VAR _d = fact_orders[delay_days]
+VAR _d = fato_pedidos[dias_atraso]
 RETURN
     SWITCH (
         TRUE (),
@@ -175,7 +175,7 @@ RETURN
     )
 
 Faixa Parcelas =
-VAR _p = fact_orders[installments_max]
+VAR _p = fato_pedidos[parcelas_max]
 RETURN
     SWITCH (
         TRUE (),
@@ -188,10 +188,10 @@ RETURN
     )
 
 Valor Produtos =
-SUMX ( RELATEDTABLE ( fact_items ), fact_items[revenue] )
+SUMX ( RELATEDTABLE ( fato_itens ), fato_itens[receita] )
 
 Faixa Valor Pedido =
-VAR _v = fact_orders[Valor Produtos]
+VAR _v = fato_pedidos[Valor Produtos]
 RETURN
     SWITCH (
         TRUE (),

@@ -1,70 +1,72 @@
 # Modelo para Power BI (Etapa 5)
 
-Gerar os arquivos: `python -m src.run_clean && python -m src.run_model && python -m src.export_powerbi`
+Gerar os arquivos: `python -m src.executar_limpeza && python -m src.executar_modelo && python -m src.exportar_powerbi`
 Saída em `data/processed/powerbi/` (não versionada): 6 tabelas em **CSV** (UTF-8 com BOM) e **Parquet** (mesmos dados).
 
 | Tabela | Linhas | Colunas | Papel |
 |---|---|---|---|
-| fact_orders | 99.441 | 24 | Fato, grão = pedido (datas, prazo, atraso, nota, pagamento, recorrência) |
-| fact_items | 112.650 | 6 | Fato, grão = item (receita, frete, produto, vendedor) |
-| dim_date | 852 | 11 | Calendário (2016-09 a 2018-12), rótulos em português |
-| dim_customer | 99.441 | 7 | Cliente por pedido (`customer_id`), com `customer_unique_id`, UF, lat/lng |
-| dim_product | 32.951 | 5 | Categoria (PT/EN), peso, fotos |
-| dim_seller | 3.095 | 6 | Vendedor, UF, lat/lng |
+| fato_pedidos | 99.441 | 24 | Fato, grão = pedido (datas, prazo, atraso, nota, pagamento, recorrência) |
+| fato_itens | 112.650 | 6 | Fato, grão = item (receita, frete, produto, vendedor) |
+| dim_data | 852 | 11 | Calendário (2016-09 a 2018-12), rótulos em português |
+| dim_cliente | 99.441 | 7 | Cliente por pedido (`id_cliente`), com `id_cliente_unico`, UF, lat/lng |
+| dim_produto | 32.951 | 5 | Categoria (PT/EN), peso, fotos |
+| dim_vendedor | 3.095 | 6 | Vendedor, UF, lat/lng |
+
+> **Idioma:** nomes de tabelas, colunas e medidas estão em português. Os **valores de texto** também saem em português nesta exportação (status: `Entregue`, `Cancelado`…; forma de pagamento: `Cartão de crédito`, `Boleto`…; categoria: `Beleza e saúde`…). Nos notebooks Python eles continuam como no dataset original.
 
 ## Como importar
 **Opção recomendada: Parquet** (Obter dados → Parquet). Os tipos já vêm corretos e não há problema de configuração regional.
 
 **Se usar CSV:** os decimais usam ponto (`58.90`). Se o Power BI estiver em pt-BR, ele pode interpretar `58.90` como 5890. Para evitar:
 1. Obter dados → Texto/CSV → *Origem do arquivo*: **65001 UTF-8**;
-2. Transformar dados → selecionar as colunas numéricas (`revenue`, `freight_value`, `delivery_days`, `delay_days`, `payment_value`, `estimated_days`, `lat`, `lng`) → Alterar tipo → **Usando a configuração regional… → Número decimal → Inglês (Estados Unidos)**.
+2. Transformar dados → selecionar as colunas numéricas (`receita`, `valor_frete`, `dias_entrega`, `dias_atraso`, `valor_pagamento`, `dias_estimados`, `latitude`, `longitude`) → Alterar tipo → **Usando a configuração regional… → Número decimal → Inglês (Estados Unidos)**.
 
 > Não consegui abrir o Power BI Desktop aqui, então o passo a passo abaixo segue a documentação do produto e **não foi testado**. Confira os totais com o gabarito no fim deste documento.
 
 ## Relacionamentos
 ```
-dim_date ─────────┐
+dim_data ─────────┐
                   │ 1 ──< *
-dim_customer ─── fact_orders ──< fact_items >── dim_product
+dim_cliente ─── fato_pedidos ──< fato_itens >── dim_produto
    1 ──< *            1 ──< *           * >── 1
-                                        └──── dim_seller
+                                        └──── dim_vendedor
 ```
 | De (lado muitos) | Para (lado um) | Cardinalidade | Direção do filtro | Ativo |
 |---|---|---|---|---|
-| fact_orders[date_key] | dim_date[date_key] | Muitos para um | Única | Sim |
-| fact_orders[customer_id] | dim_customer[customer_id] | Muitos para um | Única | Sim |
-| fact_items[order_id] | fact_orders[order_id] | Muitos para um | Única | Sim |
-| fact_items[product_id] | dim_product[product_id] | Muitos para um | Única | Sim |
-| fact_items[seller_id] | dim_seller[seller_id] | Muitos para um | Única | Sim |
+| fato_pedidos[chave_data] | dim_data[chave_data] | Muitos para um | Única | Sim |
+| fato_pedidos[id_cliente] | dim_cliente[id_cliente] | Muitos para um | Única | Sim |
+| fato_itens[id_pedido] | fato_pedidos[id_pedido] | Muitos para um | Única | Sim |
+| fato_itens[id_produto] | dim_produto[id_produto] | Muitos para um | Única | Sim |
+| fato_itens[id_vendedor] | dim_vendedor[id_vendedor] | Muitos para um | Única | Sim |
 
-Integridade já verificada no CSV exportado: chaves únicas nas dimensões e em `fact_orders`, `(order_id, order_item_id)` único em `fact_items`, **0 chaves órfãs** nos 5 relacionamentos.
+Integridade já verificada no CSV exportado: chaves únicas nas dimensões e em `fato_pedidos`, `(id_pedido, id_item)` único em `fato_itens`, **0 chaves órfãs** nos 5 relacionamentos.
 
-### Por que não há `date_key` em `fact_items`
-Com `date_key` nas duas fatos, `dim_date` alcançaria `fact_items` por dois caminhos (direto e via `fact_orders`), e o Power BI desativa um relacionamento ou gera ambiguidade. Deixando a data só em `fact_orders`, o filtro de data **propaga para os itens** pelo relacionamento `fact_orders → fact_items`.
+### Por que não há `chave_data` em `fato_itens`
+Com `chave_data` nas duas fatos, `dim_data` alcançaria `fato_itens` por dois caminhos (direto e via `fato_pedidos`), e o Power BI desativa um relacionamento ou gera ambiguidade. Deixando a data só em `fato_pedidos`, o filtro de data **propaga para os itens** pelo relacionamento `fato_pedidos → fato_itens`.
 
-### Consequência importante: o filtro não volta de `fact_items` para `fact_orders`
-- Filtrar por **UF do cliente, data ou status** afeta tudo, porque esses filtros descem de `fact_orders` para `fact_items`.
-- Filtrar por **categoria ou vendedor** afeta só `fact_items`. Medidas **no nível do pedido** (nota, % de atraso) **não reagem** à categoria/vendedor se forem calculadas sobre `fact_orders`.
-- Solução (Etapa 6): para a análise por categoria/vendedor, calcular as medidas sobre `DISTINCTCOUNT(fact_items[order_id])` com filtro em `fact_orders[is_late]`. Evite a direção "Ambas" no relacionamento, que causa ambiguidade e lentidão.
+### Consequência importante: o filtro não volta de `fato_itens` para `fato_pedidos`
+- Filtrar por **UF do cliente, data ou status** afeta tudo, porque esses filtros descem de `fato_pedidos` para `fato_itens`.
+- Filtrar por **categoria ou vendedor** afeta só `fato_itens`. Medidas **no nível do pedido** (nota, % de atraso) **não reagem** à categoria/vendedor se forem calculadas sobre `fato_pedidos`.
+- Solução (Etapa 6): para a análise por categoria/vendedor, calcular as medidas sobre `DISTINCTCOUNT(fato_itens[id_pedido])` com filtro em `fato_pedidos[atrasado]`. Evite a direção "Ambas" no relacionamento, que causa ambiguidade e lentidão.
 - Por isso o % de atraso **por vendedor/categoria** em DAX contará pedidos distintos, e o notebook (Pergunta 5) calcula por itens: os números podem diferir levemente.
 
 ## Ajustes no Power BI após importar
-1. **Tabela de datas:** Ferramentas de tabela → *Marcar como tabela de datas* → coluna `date` (em `dim_date`).
-2. **Ordenação:** `dim_date[month_name]` ordenar por `month`; `dim_date[year_month]` ordenar por `year_month_key`; `weekday_name` por `weekday_num`.
-3. **Categoria de dados** (para mapas): `state` → Estado/Província · `lat` → Latitude · `lng` → Longitude.
-4. **Ocultar** chaves e colunas técnicas (`customer_id`, `date_key`, `order_id`, `product_id`, `seller_id`, `year_month_key`, `weekday_num`) para o usuário do relatório só ver o que importa.
-5. **Resumir por:** colocar *Não resumir* em `year`, `month`, `review_score`, `installments_max`, `delay_days`, `delivery_days` e nas flags (as medidas DAX farão a agregação).
-6. **Filtro de período:** `dim_date[in_analysis_period] = 1` (jan/2017–ago/2018) como filtro de relatório, igual às análises em Python.
+1. **Tabela de datas:** Ferramentas de tabela → *Marcar como tabela de datas* → coluna `data` (em `dim_data`).
+2. **Ordenação:** `dim_data[nome_mes]` ordenar por `mes`; `dim_data[ano_mes]` ordenar por `ano_mes_chave`; `nome_dia_semana` por `dia_semana_num`.
+3. **Categoria de dados** (para mapas): `uf` → Estado/Província · `latitude` → Latitude · `longitude` → Longitude.
+4. **Ocultar** chaves e colunas técnicas (`id_cliente`, `chave_data`, `id_pedido`, `id_produto`, `id_vendedor`, `ano_mes_chave`, `dia_semana_num`) para o usuário do relatório só ver o que importa.
+5. **Resumir por:** colocar *Não resumir* em `ano`, `mes`, `nota_avaliacao`, `parcelas_max`, `dias_atraso`, `dias_entrega` e nas flags (as medidas DAX farão a agregação).
+6. **Filtro de período:** `dim_data[periodo_analise] = 1` (jan/2017–ago/2018) como filtro de relatório, igual às análises em Python.
 
 ## Flags (todas 0/1, nulo quando não se aplica)
-> **Armadilha de DAX:** `BLANK() = 0` é verdadeiro. Teste flags sempre com `= 1`, nunca `= 0`; um filtro `is_late = 0` incluiria os pedidos não entregues (nulos).
+> **Armadilha de DAX:** `BLANK() = 0` é verdadeiro. Teste flags sempre com `= 1`, nunca `= 0`; um filtro `atrasado = 0` incluiria os pedidos não entregues (nulos).
 | Coluna | Significado |
 |---|---|
-| `is_valid_order` | 1 = status diferente de `canceled`/`unavailable`. **Filtrar em quase toda medida de receita** |
-| `is_late` | 1 = entregue após a data estimada; nulo se não foi entregue (então `AVERAGE(is_late)` já dá o % de atrasados) |
-| `is_delivered` | 1 = entregue com data de entrega; **nunca nulo**. Use-o como universo de entregues em DAX |
-| `is_first_order` | 1 = primeira compra válida da pessoa (para contar clientes novos) |
-| `is_recurring_customer` | 1 = a pessoa tem 2+ pedidos válidos |
+| `pedido_valido` | 1 = status diferente de `canceled`/`unavailable`. **Filtrar em quase toda medida de receita** |
+| `atrasado` | 1 = entregue após a data estimada; nulo se não foi entregue (então `AVERAGE(atrasado)` já dá o % de atrasados) |
+| `entregue` | 1 = entregue com data de entrega; **nunca nulo**. Use-o como universo de entregues em DAX |
+| `primeira_compra` | 1 = primeira compra válida da pessoa (para contar clientes novos) |
+| `cliente_recorrente` | 1 = a pessoa tem 2+ pedidos válidos |
 
 ## Gabarito para validar as medidas (Etapa 6)
 Calculado a partir dos CSV exportados. Se uma medida DAX não bater, o erro é de filtro, não de dado.

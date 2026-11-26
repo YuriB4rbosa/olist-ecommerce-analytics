@@ -45,20 +45,20 @@ Cinco páginas: Visão Executiva, Categorias e Estados, Logística e Satisfaçã
 -->
 
 ## Metodologia
-1. **Limpeza** (`src/clean.py`): datas convertidas, 1 review por pedido (551 pedidos tinham mais de uma), geolocalização agregada por CEP (1 milhão de linhas para 19 mil CEPs), categorias traduzidas. Cada decisão, com o número que a motivou, está em [`docs/decisoes_limpeza.md`](docs/decisoes_limpeza.md).
-2. **Modelagem** (`src/model.py`): esquema estrela com `fact_orders` (grão = pedido), `fact_items` (grão = item) e dimensões de cliente, produto, vendedor e data. Colunas derivadas: dias de atraso, tempo de entrega, flag de recorrência e cohort. Detalhes em [`docs/modelo_dados.md`](docs/modelo_dados.md).
+1. **Limpeza** (`src/limpeza.py`): datas convertidas, 1 avaliação por pedido (551 pedidos tinham mais de uma), geolocalização agregada por CEP (1 milhão de linhas para 19 mil CEPs), categorias traduzidas. Cada decisão, com o número que a motivou, está em [`docs/decisoes_limpeza.md`](docs/decisoes_limpeza.md).
+2. **Modelagem** (`src/modelo.py`): esquema estrela com `fato_pedidos` (grão = pedido), `fato_itens` (grão = item) e dimensões de cliente, produto, vendedor e data. Colunas derivadas: dias de atraso, tempo de entrega, flag de recorrência e cohort. Detalhes em [`docs/modelo_dados.md`](docs/modelo_dados.md).
 3. **Análise**: Pandas, Matplotlib e Seaborn, com cada pergunta fechando em insight e recomendação.
 4. **Power BI**: tabelas exportadas, medidas DAX e roteiro de montagem em [`powerbi/`](powerbi/) e [`docs/powerbi_dashboard.md`](docs/powerbi_dashboard.md), com um **gabarito** de valores esperados calculado em Pandas para validar cada medida.
 
 ### Definições de negócio
-- **Faturamento** = soma de `price` dos itens (sem frete), só de pedidos válidos (exclui `canceled` e `unavailable`).
+- **Faturamento** = soma de `preco` dos itens (sem frete), só de pedidos válidos (exclui `canceled` e `unavailable`).
 - **Atraso** = data de entrega > data estimada, comparando **datas** (não horários).
-- **Cliente** = `customer_unique_id` (o `customer_id` muda a cada pedido; usá-lo daria recompra próxima de zero).
+- **Cliente** = `id_cliente_unico` (o `id_cliente` muda a cada pedido; usá-lo daria recompra próxima de zero).
 - **Taxas de atraso por vendedor/categoria** contam pedidos distintos.
 
 ## Limitações
 - **Correlação, não causalidade:** a relação entre parcelamento, frete e ticket não prova efeito. A recomendação de frete grátis exige teste A/B.
-- **Recompra de 3%** depende de o `customer_unique_id` identificar bem a pessoa; cadastros duplicados subestimariam o número.
+- **Recompra de 3%** depende de o `id_cliente_unico` identificar bem a pessoa; cadastros duplicados subestimariam o número.
 - **Amostras pequenas** em estados do Norte/Nordeste (300 a 700 pedidos), então os valores de lá são mais voláteis. As análises por estado usam mínimo de 300 pedidos.
 - Os dados cobrem 2016–2018 de um único marketplace, e os números não devem ser extrapolados para o mercado.
 
@@ -72,9 +72,9 @@ python -m venv .venv && .venv\Scripts\activate        # Linux/Mac: source .venv/
 pip install -r requirements.txt
 
 # 1. Baixe o dataset no Kaggle e coloque os 9 CSVs em data/raw/
-python -m src.run_clean        # limpeza            -> data/processed/clean
-python -m src.run_model        # modelo estrela     -> data/processed/model
-python -m src.export_powerbi   # tabelas Power BI   -> data/processed/powerbi
+python -m src.executar_limpeza        # limpeza            -> data/processed/clean
+python -m src.executar_modelo        # modelo estrela     -> data/processed/model
+python -m src.exportar_powerbi   # tabelas Power BI   -> data/processed/powerbi
 jupyter lab                    # notebooks 01 e 02
 ```
 
@@ -83,7 +83,7 @@ jupyter lab                    # notebooks 01 e 02
 ├── data/raw/          CSVs originais (não versionados)
 ├── data/processed/    limpeza, modelo estrela e export p/ Power BI (não versionados)
 ├── notebooks/         01 e 02: análises com gráficos e insights
-├── src/               load, clean, model, viz, export_powerbi
+├── src/               carga, limpeza, modelo, visualizacao, exportar_powerbi
 ├── powerbi/           medidas.dax e tema de cores (+ .pbix)
 └── docs/              decisões de limpeza, modelo de dados, guia do dashboard, gráficos
 ```
